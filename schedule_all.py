@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Schedule all pending videos to post every 3 hours
+Schedule all pending videos to post 5 times per day (~5 hours apart)
 Uploads to both YouTube and TikTok with scheduled publish times
 """
 
@@ -60,11 +60,11 @@ def main():
         return
 
     print(f"\nFound {len(pending)} videos to schedule")
-    print("They will be scheduled every 3 hours starting now.\n")
+    print("They will be scheduled every ~5 hours (5 posts/day) starting now.\n")
 
-    # Calculate schedule times (every 3 hours)
+    # Calculate schedule times (5 posts per day = every 4.8 hours)
     start_time = datetime.now() + timedelta(minutes=10)  # Start 10 min from now
-    interval_hours = 3
+    interval_hours = 4.8  # 24 hours / 5 posts = 4.8 hours
 
     success_count = 0
 

@@ -18,6 +18,6 @@ BROWSER_STATE_DIR = BASE_DIR / "browser_state"
 
 # Settings
 HEADLESS = True  # Set to False for debugging
-POST_INTERVAL_HOURS = 3
+POST_INTERVAL_HOURS = 4.8  # 5 posts per day (24/5 = 4.8 hours)
 HUMAN_DELAY_MIN = 2  # Minimum seconds between actions
 HUMAN_DELAY_MAX = 5  # Maximum seconds between actions

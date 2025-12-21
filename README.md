@@ -203,7 +203,7 @@ instagram-tiktok-reposter/
 - Can schedule up to 10 days in advance
 
 ### Default Schedule
-- Posts every 3 hours (8 posts per day)
+- Posts every ~5 hours (5 posts per day)
 - Spreads content evenly throughout the day
 
 ## Troubleshooting
