@@ -1,0 +1,11 @@
+# Core dependencies
+python-dotenv>=1.0.0
+playwright>=1.40.0
+yt-dlp>=2024.0.0
+
+# YouTube API
+google-api-python-client>=2.100.0
+google-auth-oauthlib>=1.0.0
+
+# TikTok upload
+tiktokautouploader>=4.5

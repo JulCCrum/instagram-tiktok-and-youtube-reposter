@@ -1,0 +1,46 @@
+# Environment & Secrets
+.env
+*.pickle
+*.json
+!.env.example
+!package.json
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Browser state (contains login sessions - sensitive!)
+browser_state/
+browser_state.tar.gz
+TK_cookies_*.json
+tiktok_cookies.json
+
+# YouTube credentials
+client_secrets.json
+youtube_token.pickle
+
+# Downloaded media (large files)
+media/
+
+# Progress tracking (user-specific)
+progress.json
+
+# Logs
+*.log
+cron.log
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# IDE
+.idea/
+.vscode/
+*.sublime-*
