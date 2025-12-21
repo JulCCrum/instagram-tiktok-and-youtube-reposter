@@ -34,7 +34,7 @@ pip install yt-dlp
 ### 1. Clone and Setup
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/instagram-tiktok-reposter.git
+git clone https://github.com/JulCCrum/instagram-tiktok-reposter.git
 cd instagram-tiktok-reposter
 
 # Create virtual environment
