@@ -68,8 +68,10 @@ def login_instagram(page: Page) -> bool:
     # Wait for login form
     try:
         page.wait_for_selector('input[name="username"]', timeout=10000)
-    except:
-        print("Could not find login form")
+    except Exception:
+        print("ERROR: Could not find Instagram login form.")
+        print("  -> Instagram may have changed their page layout.")
+        print("  -> Try running 'python main.py init' to login manually instead.")
         return False
 
     # Fill credentials
@@ -99,6 +101,23 @@ def login_instagram(page: Page) -> bool:
             human_delay(2, 3)
     except:
         pass
+
+    # Verify login actually worked
+    human_delay(3, 5)
+    current_url = page.url
+
+    # Check for challenge/verification pages
+    if "challenge" in current_url or "two_factor" in current_url:
+        print("WARNING: Instagram is requesting verification (2FA or suspicious login).")
+        print("  -> Run 'python main.py init' to login manually in a browser.")
+        return False
+
+    # Check we're not still on the login page
+    if "login" in current_url or "accounts/login" in current_url:
+        print("WARNING: Login may have failed — still on login page.")
+        print("  -> Check your credentials in .env")
+        print("  -> Or run 'python main.py init' to login manually.")
+        return False
 
     print("Logged into Instagram successfully")
     return True
@@ -266,7 +285,18 @@ def scrape_instagram_posts(username: str = None, max_posts: int = 500) -> List[D
 
         try:
             # Login
-            login_instagram(page)
+            if not login_instagram(page):
+                print("ERROR: Could not log into Instagram.")
+                print("  -> Run 'python main.py init' to re-login manually.")
+                return []
+
+            # Verify session by navigating to profile
+            page.goto(f"https://www.instagram.com/{username}/", timeout=30000)
+            human_delay(3, 5)
+            if "login" in page.url:
+                print("ERROR: Instagram session expired — got redirected to login.")
+                print("  -> Run 'python main.py init' to re-login manually.")
+                return []
 
             # Get posts list
             posts = get_profile_posts(page, username, max_posts)

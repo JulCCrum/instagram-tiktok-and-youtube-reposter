@@ -59,12 +59,13 @@ def main():
         print("No pending videos to schedule!")
         return
 
-    print(f"\nFound {len(pending)} videos to schedule")
-    print("They will be scheduled every ~5 hours (5 posts/day) starting now.\n")
+    interval_hours = config.POST_INTERVAL_HOURS
+    posts_per_day = config.POSTS_PER_DAY
 
-    # Calculate schedule times (5 posts per day = every 4.8 hours)
-    start_time = datetime.now() + timedelta(minutes=10)  # Start 10 min from now
-    interval_hours = 4.8  # 24 hours / 5 posts = 4.8 hours
+    print(f"\nFound {len(pending)} videos to schedule")
+    print(f"Posting {posts_per_day}x/day (every ~{interval_hours} hours) starting now.\n")
+
+    start_time = datetime.now() + timedelta(minutes=10)
 
     success_count = 0
 
@@ -81,36 +82,57 @@ def main():
         tiktok_ok = False
 
         # Schedule on YouTube
-        print("\n[YouTube] Uploading and scheduling...")
-        try:
-            youtube_ok = schedule_youtube(post, publish_time)
-            if youtube_ok:
-                print("[YouTube] SUCCESS - Scheduled!")
-            else:
-                print("[YouTube] FAILED")
-        except Exception as e:
-            print(f"[YouTube] ERROR: {e}")
+        if config.USE_YOUTUBE:
+            print("\n[YouTube] Uploading and scheduling...")
+            try:
+                youtube_ok = schedule_youtube(post, publish_time)
+                if youtube_ok:
+                    print("[YouTube] SUCCESS - Scheduled!")
+                else:
+                    print("[YouTube] FAILED")
+            except Exception as e:
+                print(f"[YouTube] ERROR: {e}")
 
         # Schedule on TikTok
-        print("\n[TikTok] Uploading and scheduling...")
-        try:
-            tiktok_ok = schedule_tiktok(post, publish_time)
-            if tiktok_ok:
-                print("[TikTok] SUCCESS - Scheduled!")
-            else:
-                print("[TikTok] FAILED")
-        except Exception as e:
-            print(f"[TikTok] ERROR: {e}")
+        if config.USE_TIKTOK:
+            print("\n[TikTok] Uploading and scheduling...")
+            try:
+                tiktok_ok = schedule_tiktok(post, publish_time)
+                if tiktok_ok:
+                    print("[TikTok] SUCCESS - Scheduled!")
+                else:
+                    print("[TikTok] FAILED")
+            except Exception as e:
+                print(f"[TikTok] ERROR: {e}")
 
-        # Mark as uploaded if at least one platform succeeded
+        # Track per-platform results
         if youtube_ok or tiktok_ok:
             progress = load_progress()
-            uploaded = progress.get("uploaded", [])
-            uploaded.append(post["shortcode"])
-            progress["uploaded"] = uploaded
+            shortcode = post["shortcode"]
+            if youtube_ok:
+                yt_list = progress.get("uploaded_youtube", [])
+                if shortcode not in yt_list:
+                    yt_list.append(shortcode)
+                    progress["uploaded_youtube"] = yt_list
+            if tiktok_ok:
+                tt_list = progress.get("uploaded_tiktok", [])
+                if shortcode not in tt_list:
+                    tt_list.append(shortcode)
+                    progress["uploaded_tiktok"] = tt_list
+            # Mark fully uploaded if all enabled platforms succeeded
+            all_done = True
+            if config.USE_YOUTUBE and not youtube_ok:
+                all_done = False
+            if config.USE_TIKTOK and not tiktok_ok:
+                all_done = False
+            if all_done:
+                uploaded = progress.get("uploaded", [])
+                if shortcode not in uploaded:
+                    uploaded.append(shortcode)
+                    progress["uploaded"] = uploaded
             save_progress(progress)
             success_count += 1
-            print(f"\n[OK] Marked {post['shortcode']} as scheduled")
+            print(f"\n[OK] Marked {shortcode} as scheduled")
 
     print("\n" + "=" * 60)
     print(f"DONE! Scheduled {success_count}/{len(pending)} videos")

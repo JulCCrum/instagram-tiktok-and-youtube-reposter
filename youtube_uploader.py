@@ -25,6 +25,17 @@ TOKEN_FILE = Path(__file__).parent / "youtube_token.pickle"
 
 def get_authenticated_service():
     """Get authenticated YouTube service"""
+    if not CLIENT_SECRETS_FILE.exists():
+        print("ERROR: client_secrets.json not found.")
+        print("  -> You need YouTube API credentials from Google Cloud Console.")
+        print("  -> Steps:")
+        print("     1. Go to https://console.cloud.google.com/")
+        print("     2. Create a project and enable 'YouTube Data API v3'")
+        print("     3. Create OAuth 2.0 credentials (Desktop App)")
+        print("     4. Download the JSON and save as 'client_secrets.json'")
+        print(f"        in: {CLIENT_SECRETS_FILE.parent}/")
+        raise FileNotFoundError("client_secrets.json missing — see instructions above")
+
     credentials = None
 
     # Load saved credentials if they exist
@@ -35,8 +46,13 @@ def get_authenticated_service():
     # Refresh or get new credentials if needed
     if not credentials or not credentials.valid:
         if credentials and credentials.expired and credentials.refresh_token:
-            credentials.refresh(Request())
-        else:
+            try:
+                credentials.refresh(Request())
+            except Exception as e:
+                print(f"WARNING: Could not refresh YouTube token: {e}")
+                print("  -> Re-authenticating...")
+                credentials = None
+        if not credentials or not credentials.valid:
             flow = InstalledAppFlow.from_client_secrets_file(
                 str(CLIENT_SECRETS_FILE), SCOPES)
             credentials = flow.run_local_server(port=8080)
@@ -144,8 +160,25 @@ def upload_to_youtube(post: Dict) -> bool:
         print(f"Successfully uploaded to YouTube: https://youtube.com/shorts/{video_id}")
         return True
 
+    except FileNotFoundError:
+        return False  # Already printed detailed message in get_authenticated_service
     except Exception as e:
-        print(f"Error uploading to YouTube: {e}")
+        error_msg = str(e).lower()
+        print(f"ERROR uploading to YouTube: {e}")
+        if "quota" in error_msg or "rateLimitExceeded" in str(e):
+            print("  -> YouTube API daily quota exceeded.")
+            print("  -> Fix: Wait until midnight Pacific Time for quota reset.")
+            print("  -> Or request higher quota at https://console.cloud.google.com/")
+        elif "forbidden" in error_msg or "403" in error_msg:
+            print("  -> YouTube rejected the upload. Your API credentials may lack permissions.")
+            print("  -> Fix: Re-run 'python youtube_uploader.py' to re-authenticate.")
+        elif "invalid" in error_msg and "token" in error_msg:
+            print("  -> YouTube auth token is invalid or expired.")
+            print("  -> Fix: Delete youtube_token.pickle and re-run 'python youtube_uploader.py'")
+        elif "network" in error_msg or "connection" in error_msg or "timeout" in error_msg:
+            print("  -> Network error. Check your internet connection and try again.")
+        else:
+            print("  -> If this persists, try deleting youtube_token.pickle and re-authenticating.")
         return False
 
 
@@ -218,8 +251,17 @@ def upload_to_youtube_scheduled(post: Dict, publish_time) -> bool:
         print(f"Scheduled on YouTube: https://youtube.com/shorts/{video_id}")
         return True
 
+    except FileNotFoundError:
+        return False
     except Exception as e:
-        print(f"Error uploading to YouTube: {e}")
+        error_msg = str(e).lower()
+        print(f"ERROR scheduling on YouTube: {e}")
+        if "quota" in error_msg or "rateLimitExceeded" in str(e):
+            print("  -> YouTube API daily quota exceeded. Wait until midnight PT.")
+        elif "forbidden" in error_msg or "403" in error_msg:
+            print("  -> Permission denied. Re-authenticate: python youtube_uploader.py")
+        else:
+            print("  -> If this persists, delete youtube_token.pickle and re-authenticate.")
         return False
 
 

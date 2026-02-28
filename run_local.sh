@@ -1,14 +1,13 @@
 #!/bin/bash
-# Local cron runner for Instagram to TikTok reposter
-# This script is designed to run from cron on your Mac
+# Local cron runner for Instagram to TikTok/YouTube reposter
+# Auto-detects paths so it works on any machine
 
-cd /Users/chasecrummedyo/instagram-tiktok-reposter
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
-# Activate virtual environment
 source venv/bin/activate
 
-# Run the reposter (uploads to both YouTube and TikTok)
-python main.py run --tiktok >> /Users/chasecrummedyo/instagram-tiktok-reposter/cron.log 2>&1
+# Pass through any args (e.g. --tiktok)
+python main.py run "$@" >> "$SCRIPT_DIR/cron.log" 2>&1
 
-# Add timestamp
-echo "--- Run completed at $(date) ---" >> /Users/chasecrummedyo/instagram-tiktok-reposter/cron.log
+echo "--- Run completed at $(date) ---" >> "$SCRIPT_DIR/cron.log"
