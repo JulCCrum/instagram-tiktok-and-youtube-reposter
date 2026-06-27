@@ -13,10 +13,31 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
+import re
+
 import config
+from notifier import notify_failure
 
 # YouTube API scopes
 SCOPES = ['https://www.googleapis.com/auth/youtube.upload']
+
+
+def _youtube_safe_title(caption: str, shortcode: str) -> str:
+    """Build a YouTube-valid title from a post caption.
+
+    The title is the FIRST LINE of the caption (everything before the first
+    line break) — this reads as a natural headline instead of a mid-sentence
+    chop. YouTube's API rejects any title containing '<' or '>' with an
+    'invalidTitle' error, so rather than dropping those characters we
+    substitute their plain-English meaning (e.g. '<1%' -> 'less than 1%').
+    Runs of whitespace are collapsed and the result is capped at YouTube's
+    100-character title limit, falling back to the shortcode if empty.
+    """
+    first_line = caption.split("\n", 1)[0] if caption else ""
+    raw = first_line if first_line.strip() else f"Short - {shortcode}"
+    raw = raw.replace("<", " less than ").replace(">", " greater than ")
+    raw = re.sub(r"\s+", " ", raw).strip()
+    return raw[:100].strip() or f"Short - {shortcode}"
 
 # Path to credentials
 CLIENT_SECRETS_FILE = Path(__file__).parent / "client_secrets.json"
@@ -102,12 +123,18 @@ def upload_to_youtube(post: Dict) -> bool:
     video_files = [f for f in post.get("media_files", []) if f.endswith(".mp4") and "_youtube" not in f]
     if not video_files:
         print("No video file found in post")
+        notify_failure("YouTube", post.get("shortcode", "?"),
+                       "No video file found in post",
+                       "The post has no .mp4 in media_files — re-download it from Instagram.")
         return False
 
     video_path = video_files[0]
 
     if not os.path.exists(video_path):
         print(f"Video file not found: {video_path}")
+        notify_failure("YouTube", post.get("shortcode", "?"),
+                       f"Video file not found: {video_path}",
+                       "The expected video file is missing on disk — re-download the post.")
         return False
 
     # Convert video for YouTube compatibility
@@ -123,8 +150,8 @@ def upload_to_youtube(post: Dict) -> bool:
         if "#shorts" not in caption.lower():
             caption = f"{caption}\n\n#Shorts"
 
-        # Truncate title if too long (YouTube limit is 100 chars)
-        title = caption[:100] if caption else f"Short - {post['shortcode']}"
+        # Build a YouTube-safe title (substitutes '<'/'>' — see _youtube_safe_title)
+        title = _youtube_safe_title(caption, post['shortcode'])
 
         body = {
             'snippet': {
@@ -166,19 +193,19 @@ def upload_to_youtube(post: Dict) -> bool:
         error_msg = str(e).lower()
         print(f"ERROR uploading to YouTube: {e}")
         if "quota" in error_msg or "rateLimitExceeded" in str(e):
-            print("  -> YouTube API daily quota exceeded.")
-            print("  -> Fix: Wait until midnight Pacific Time for quota reset.")
-            print("  -> Or request higher quota at https://console.cloud.google.com/")
+            hint = "YouTube API daily quota exceeded. Wait until midnight Pacific Time for reset, or request higher quota at https://console.cloud.google.com/"
         elif "forbidden" in error_msg or "403" in error_msg:
-            print("  -> YouTube rejected the upload. Your API credentials may lack permissions.")
-            print("  -> Fix: Re-run 'python youtube_uploader.py' to re-authenticate.")
+            hint = "YouTube rejected the upload (permissions). Re-run 'python youtube_uploader.py' to re-authenticate."
         elif "invalid" in error_msg and "token" in error_msg:
-            print("  -> YouTube auth token is invalid or expired.")
-            print("  -> Fix: Delete youtube_token.pickle and re-run 'python youtube_uploader.py'")
+            hint = "YouTube auth token is invalid or expired. Delete youtube_token.pickle and re-run 'python youtube_uploader.py'."
+        elif "invalidtitle" in error_msg or ("invalid" in error_msg and "title" in error_msg):
+            hint = "The video title was rejected by YouTube (e.g. it contained '<' or '>'). Check _youtube_safe_title in youtube_uploader.py."
         elif "network" in error_msg or "connection" in error_msg or "timeout" in error_msg:
-            print("  -> Network error. Check your internet connection and try again.")
+            hint = "Network error. Check your internet connection and try again."
         else:
-            print("  -> If this persists, try deleting youtube_token.pickle and re-authenticating.")
+            hint = "If this persists, try deleting youtube_token.pickle and re-authenticating."
+        print(f"  -> {hint}")
+        notify_failure("YouTube", post.get("shortcode", "?"), str(e), hint)
         return False
 
 
@@ -211,8 +238,8 @@ def upload_to_youtube_scheduled(post: Dict, publish_time) -> bool:
         if "#shorts" not in caption.lower():
             caption = f"{caption}\n\n#Shorts"
 
-        # Truncate title if too long
-        title = caption[:100] if caption else f"Short - {post['shortcode']}"
+        # Build a YouTube-safe title (substitutes '<'/'>' — see _youtube_safe_title)
+        title = _youtube_safe_title(caption, post['shortcode'])
 
         # Format publish time for YouTube API (ISO 8601)
         publish_at = publish_time.strftime('%Y-%m-%dT%H:%M:%S.000Z')

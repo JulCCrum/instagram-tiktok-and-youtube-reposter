@@ -129,20 +129,29 @@ def upload_command(args):
         print("[DRY RUN] No changes made.")
         return
 
-    # Upload to YouTube
+    # Upload to YouTube (skip if already uploaded to YouTube)
     youtube_success = False
     tiktok_success = False
+    progress = load_progress()
 
     if config.USE_YOUTUBE:
-        print("\n--- YouTube ---")
-        youtube_success = upload_to_youtube(post)
+        if shortcode in progress.get("uploaded_youtube", []):
+            print("\n--- YouTube --- (already uploaded, skipping)")
+            youtube_success = True
+        else:
+            print("\n--- YouTube ---")
+            youtube_success = upload_to_youtube(post)
         if youtube_success:
             mark_uploaded(shortcode, "youtube")
 
-    # Upload to TikTok (if enabled via flag or config)
+    # Upload to TikTok (skip if already uploaded to TikTok)
     if args.tiktok or config.USE_TIKTOK:
-        print("\n--- TikTok ---")
-        tiktok_success = upload_to_tiktok(post)
+        if shortcode in progress.get("uploaded_tiktok", []):
+            print("\n--- TikTok --- (already uploaded, skipping)")
+            tiktok_success = True
+        else:
+            print("\n--- TikTok ---")
+            tiktok_success = upload_to_tiktok(post)
         if tiktok_success:
             mark_uploaded(shortcode, "tiktok")
 
@@ -217,19 +226,28 @@ def run_command(args):
         print("[DRY RUN] No changes made.")
         return
 
-    # Upload to YouTube
+    # Upload to YouTube (skip if already uploaded to YouTube)
     shortcode = post['shortcode']
     print(f"Uploading: {shortcode}")
     youtube_success = False
+    progress = load_progress()
     if config.USE_YOUTUBE:
-        youtube_success = upload_to_youtube(post)
+        if shortcode in progress.get("uploaded_youtube", []):
+            print("[YouTube] Already uploaded, skipping")
+            youtube_success = True
+        else:
+            youtube_success = upload_to_youtube(post)
         if youtube_success:
             mark_uploaded(shortcode, "youtube")
 
-    # Upload to TikTok (if enabled via flag or config)
+    # Upload to TikTok (skip if already uploaded to TikTok)
     tiktok_success = False
     if getattr(args, 'tiktok', False) or config.USE_TIKTOK:
-        tiktok_success = upload_to_tiktok(post)
+        if shortcode in progress.get("uploaded_tiktok", []):
+            print("[TikTok] Already uploaded, skipping")
+            tiktok_success = True
+        else:
+            tiktok_success = upload_to_tiktok(post)
         if tiktok_success:
             mark_uploaded(shortcode, "tiktok")
 

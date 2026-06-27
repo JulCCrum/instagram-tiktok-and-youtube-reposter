@@ -33,9 +33,9 @@ HUMAN_DELAY_MIN = 2
 HUMAN_DELAY_MAX = 5
 
 # Platform toggles
-PLATFORMS = _user_config.get("platforms", {"youtube": True, "tiktok": True})
+PLATFORMS = _user_config.get("platforms", {"youtube": True, "tiktok": False})
 USE_YOUTUBE = PLATFORMS.get("youtube", True)
-USE_TIKTOK = PLATFORMS.get("tiktok", True)
+USE_TIKTOK = PLATFORMS.get("tiktok", False)
 
 # TikTok account name (from env or user_config)
 if not TIKTOK_ACCOUNT_NAME:

@@ -80,30 +80,39 @@ def main():
 
         youtube_ok = False
         tiktok_ok = False
+        progress = load_progress()
 
-        # Schedule on YouTube
+        # Schedule on YouTube (skip if already uploaded)
         if config.USE_YOUTUBE:
-            print("\n[YouTube] Uploading and scheduling...")
-            try:
-                youtube_ok = schedule_youtube(post, publish_time)
-                if youtube_ok:
-                    print("[YouTube] SUCCESS - Scheduled!")
-                else:
-                    print("[YouTube] FAILED")
-            except Exception as e:
-                print(f"[YouTube] ERROR: {e}")
+            if post['shortcode'] in progress.get("uploaded_youtube", []):
+                print("\n[YouTube] Already uploaded, skipping")
+                youtube_ok = True
+            else:
+                print("\n[YouTube] Uploading and scheduling...")
+                try:
+                    youtube_ok = schedule_youtube(post, publish_time)
+                    if youtube_ok:
+                        print("[YouTube] SUCCESS - Scheduled!")
+                    else:
+                        print("[YouTube] FAILED")
+                except Exception as e:
+                    print(f"[YouTube] ERROR: {e}")
 
-        # Schedule on TikTok
+        # Schedule on TikTok (skip if already uploaded)
         if config.USE_TIKTOK:
-            print("\n[TikTok] Uploading and scheduling...")
-            try:
-                tiktok_ok = schedule_tiktok(post, publish_time)
-                if tiktok_ok:
-                    print("[TikTok] SUCCESS - Scheduled!")
-                else:
-                    print("[TikTok] FAILED")
-            except Exception as e:
-                print(f"[TikTok] ERROR: {e}")
+            if post['shortcode'] in progress.get("uploaded_tiktok", []):
+                print("\n[TikTok] Already uploaded, skipping")
+                tiktok_ok = True
+            else:
+                print("\n[TikTok] Uploading and scheduling...")
+                try:
+                    tiktok_ok = schedule_tiktok(post, publish_time)
+                    if tiktok_ok:
+                        print("[TikTok] SUCCESS - Scheduled!")
+                    else:
+                        print("[TikTok] FAILED")
+                except Exception as e:
+                    print(f"[TikTok] ERROR: {e}")
 
         # Track per-platform results
         if youtube_ok or tiktok_ok:
