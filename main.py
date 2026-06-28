@@ -14,6 +14,7 @@ Usage:
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -37,9 +38,12 @@ def mark_uploaded(shortcode: str, platform: str = None):
             platform_list.append(shortcode)
             progress[key] = platform_list
 
-    # Check if post is done on ALL enabled platforms
+    # Check if post is done on ALL enabled platforms. A post on the YouTube
+    # skip-list (recorded in "skipped_youtube") counts as handled for YouTube.
     all_done = True
-    if config.USE_YOUTUBE and shortcode not in progress.get("uploaded_youtube", []):
+    if (config.USE_YOUTUBE
+            and shortcode not in progress.get("uploaded_youtube", [])
+            and shortcode not in progress.get("skipped_youtube", [])):
         all_done = False
     if config.USE_TIKTOK and shortcode not in progress.get("uploaded_tiktok", []):
         all_done = False
@@ -52,6 +56,54 @@ def mark_uploaded(shortcode: str, platform: str = None):
             progress["uploaded"] = uploaded
 
     save_progress(progress)
+
+
+# --- YouTube skip-list: reels the user has chosen to NEVER post to YouTube ---
+SKIP_FILE = Path(__file__).parent / "youtube_skip.json"
+
+
+def load_youtube_skip() -> set:
+    """Return the set of Instagram shortcodes to omit from YouTube."""
+    if SKIP_FILE.exists():
+        try:
+            with open(SKIP_FILE) as f:
+                return set(json.load(f))
+        except (json.JSONDecodeError, ValueError):
+            return set()
+    return set()
+
+
+def add_youtube_skip(shortcode: str):
+    """Add a shortcode to the YouTube skip-list (idempotent)."""
+    skips = load_youtube_skip()
+    skips.add(shortcode)
+    with open(SKIP_FILE, "w") as f:
+        json.dump(sorted(skips), f, indent=2)
+
+
+def record_youtube_skip(shortcode: str):
+    """Mark a post as intentionally omitted from YouTube (NOT uploaded).
+
+    Records it in "skipped_youtube" for an honest audit trail, then recomputes
+    completion so the post leaves the pending queue once every OTHER enabled
+    platform is done (with TikTok off, that's immediately).
+    """
+    progress = load_progress()
+    skipped = progress.get("skipped_youtube", [])
+    if shortcode not in skipped:
+        skipped.append(shortcode)
+        progress["skipped_youtube"] = skipped
+        save_progress(progress)
+    mark_uploaded(shortcode)
+
+
+def _extract_shortcode(value: str) -> str:
+    """Pull the shortcode from an Instagram URL, or pass through a bare code."""
+    value = value.strip().rstrip("/")
+    m = re.search(r"/(?:reel|reels|p|tv)/([^/?#]+)", value)
+    if m:
+        return m.group(1)
+    return value.split("?")[0].split("/")[-1]
 
 
 def get_next_post_to_upload() -> Optional[Dict]:
@@ -143,14 +195,18 @@ def upload_command(args):
     progress = load_progress()
 
     if config.USE_YOUTUBE:
-        if shortcode in progress.get("uploaded_youtube", []):
+        if shortcode in load_youtube_skip():
+            print("\n--- YouTube --- (omitted by user — on skip-list)")
+            record_youtube_skip(shortcode)
+        elif shortcode in progress.get("uploaded_youtube", []):
             print("\n--- YouTube --- (already uploaded, skipping)")
             youtube_success = True
+            mark_uploaded(shortcode, "youtube")
         else:
             print("\n--- YouTube ---")
             youtube_success = upload_to_youtube(post)
-        if youtube_success:
-            mark_uploaded(shortcode, "youtube")
+            if youtube_success:
+                mark_uploaded(shortcode, "youtube")
 
     # Upload to TikTok (skip if already uploaded to TikTok)
     if args.tiktok or config.USE_TIKTOK:
@@ -220,6 +276,18 @@ def run_command(args):
             print("[DRY RUN] Would skip non-video post and try next")
         return
 
+    # Honor the YouTube skip-list. With TikTok disabled this omits the post
+    # entirely; advance to the next pending post so the run still works.
+    shortcode = post['shortcode']
+    if shortcode in load_youtube_skip():
+        print(f"Post {shortcode} is on the YouTube skip-list (omitted by user), skipping...")
+        if not dry_run:
+            record_youtube_skip(shortcode)
+            run_command(args)  # try the next post
+        else:
+            print("[DRY RUN] Would omit this post and try the next")
+        return
+
     if dry_run:
         caption = post.get('caption', '')
         platforms = []
@@ -268,6 +336,33 @@ def run_command(args):
         print(f"Reposted {shortcode} to: {', '.join(results)}")
     else:
         print(f"Failed to upload: {shortcode}")
+
+
+def skip_command(args):
+    """Manage the YouTube skip-list (reels to never post to YouTube)."""
+    if args.list or not args.items:
+        skips = sorted(load_youtube_skip())
+        print(f"YouTube skip-list ({len(skips)} reel(s) — never posted to YouTube):")
+        for sc in skips:
+            print(f"  {sc}")
+        if not skips:
+            print("  (empty)")
+        if not args.items:
+            return
+
+    codes = [_extract_shortcode(x) for x in args.items]
+    if args.remove:
+        skips = load_youtube_skip()
+        for c in codes:
+            skips.discard(c)
+        with open(SKIP_FILE, "w") as f:
+            json.dump(sorted(skips), f, indent=2)
+        print(f"Removed from skip-list: {', '.join(codes)}")
+    else:
+        for c in codes:
+            add_youtube_skip(c)
+        print(f"Added to YouTube skip-list (will never post to YouTube): {', '.join(codes)}")
+    print(f"Skip-list is now: {sorted(load_youtube_skip())}")
 
 
 def status_command(args):
@@ -562,6 +657,12 @@ Examples:
     run_parser.add_argument("--tiktok", action="store_true", help="Also upload to TikTok")
     run_parser.add_argument("--dry-run", action="store_true", help="Show what would happen without uploading")
 
+    # Skip command (manage the YouTube skip-list)
+    skip_parser = subparsers.add_parser("skip", help="Omit reels from YouTube (skip-list)")
+    skip_parser.add_argument("items", nargs="*", help="Instagram reel URLs or shortcodes to omit")
+    skip_parser.add_argument("--list", action="store_true", help="Show the current skip-list")
+    skip_parser.add_argument("--remove", action="store_true", help="Remove the given items from the skip-list")
+
     # Status command
     status_parser = subparsers.add_parser("status", help="Show progress status")
 
@@ -578,6 +679,8 @@ Examples:
         upload_command(args)
     elif args.command == "run":
         run_command(args)
+    elif args.command == "skip":
+        skip_command(args)
     elif args.command == "status":
         status_command(args)
     elif args.command == "test":
