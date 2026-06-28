@@ -78,7 +78,15 @@ def get_next_post_to_upload() -> Optional[Dict]:
     meta_file = post_dir / "metadata.json"
     if meta_file.exists():
         with open(meta_file) as f:
-            return json.load(f)
+            post = json.load(f)
+
+        # Normalize media file paths to current machine (handles migrations across machines)
+        if "media_files" in post and post["media_files"]:
+            post["media_files"] = [
+                str(post_dir / Path(mf).name) for mf in post["media_files"]
+            ]
+
+        return post
 
     return None
 
