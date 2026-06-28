@@ -7,5 +7,8 @@ yt-dlp>=2024.0.0
 google-api-python-client>=2.100.0
 google-auth-oauthlib>=1.0.0
 
+# Content Engine shared-list sync (Firestore)
+firebase-admin>=7.0.0
+
 # TikTok upload
 tiktokautouploader>=4.5

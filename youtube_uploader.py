@@ -127,8 +127,34 @@ def convert_video_for_youtube(input_path: str) -> str:
         return input_path
 
 
-def upload_to_youtube(post: Dict) -> bool:
-    """Upload a video to YouTube as a Short"""
+def _verify_youtube_video(youtube, video_id: str) -> bool:
+    """Confirm the uploaded video actually landed and wasn't rejected.
+
+    Re-fetches the video's status. If the read scope isn't granted (the token
+    may be upload-only), we trust the insert response rather than fail.
+    """
+    try:
+        resp = youtube.videos().list(part="status", id=video_id).execute()
+        items = resp.get("items", [])
+        if not items:
+            print(f"  -> VERIFY FAILED: video {video_id} not found after upload")
+            return False
+        status = items[0].get("status", {})
+        if status.get("rejectionReason"):
+            print(f"  -> VERIFY FAILED: rejected ({status['rejectionReason']})")
+            return False
+        if status.get("uploadStatus") == "failed":
+            print(f"  -> VERIFY FAILED: uploadStatus failed ({status.get('failureReason')})")
+            return False
+        print(f"  -> VERIFY OK: uploadStatus={status.get('uploadStatus')}")
+        return True
+    except Exception as e:  # noqa: BLE001
+        print(f"  -> VERIFY skipped (no read scope?), trusting insert: {e}")
+        return True
+
+
+def upload_to_youtube(post: Dict) -> Optional[str]:
+    """Upload a video to YouTube as a Short. Returns the video ID, or None."""
 
     # Find video file
     video_files = [f for f in post.get("media_files", []) if f.endswith(".mp4") and "_youtube" not in f]
@@ -137,7 +163,7 @@ def upload_to_youtube(post: Dict) -> bool:
         notify_failure("YouTube", post.get("shortcode", "?"),
                        "No video file found in post",
                        "The post has no .mp4 in media_files — re-download it from Instagram.")
-        return False
+        return None
 
     video_path = video_files[0]
 
@@ -146,7 +172,7 @@ def upload_to_youtube(post: Dict) -> bool:
         notify_failure("YouTube", post.get("shortcode", "?"),
                        f"Video file not found: {video_path}",
                        "The expected video file is missing on disk — re-download the post.")
-        return False
+        return None
 
     # Convert video for YouTube compatibility
     video_path = convert_video_for_youtube(video_path)
@@ -195,11 +221,24 @@ def upload_to_youtube(post: Dict) -> bool:
         response = request.execute()
 
         video_id = response.get('id')
+        if not video_id:
+            notify_failure("YouTube", post.get("shortcode", "?"),
+                           "Upload returned no video id",
+                           "YouTube accepted the request but returned no id — treat as failed.")
+            return None
+
+        # Confirm it really landed (the whole point of repost-check)
+        if not _verify_youtube_video(youtube, video_id):
+            notify_failure("YouTube", post.get("shortcode", "?"),
+                           f"Post-upload verification failed for {video_id}",
+                           "The video didn't show as live on YouTube after upload.")
+            return None
+
         print(f"Successfully uploaded to YouTube: https://youtube.com/shorts/{video_id}")
-        return True
+        return video_id
 
     except FileNotFoundError:
-        return False  # Already printed detailed message in get_authenticated_service
+        return None  # Already printed detailed message in get_authenticated_service
     except Exception as e:
         error_msg = str(e).lower()
         print(f"ERROR uploading to YouTube: {e}")
@@ -217,7 +256,7 @@ def upload_to_youtube(post: Dict) -> bool:
             hint = "If this persists, try deleting youtube_token.pickle and re-authenticating."
         print(f"  -> {hint}")
         notify_failure("YouTube", post.get("shortcode", "?"), str(e), hint)
-        return False
+        return None
 
 
 def upload_to_youtube_scheduled(post: Dict, publish_time) -> bool:

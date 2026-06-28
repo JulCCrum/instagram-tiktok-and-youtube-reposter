@@ -24,7 +24,7 @@ from typing import Optional, Dict
 import config
 from instagram_scraper import scrape_instagram_posts, load_progress, save_progress
 from tiktok_uploader import upload_to_tiktok
-from youtube_uploader import upload_to_youtube
+from youtube_uploader import upload_to_youtube, _youtube_safe_title
 
 
 def mark_uploaded(shortcode: str, platform: str = None):
@@ -104,6 +104,39 @@ def _extract_shortcode(value: str) -> str:
     if m:
         return m.group(1)
     return value.split("?")[0].split("/")[-1]
+
+
+def _record_repost_outcome(post: Dict, shortcode: str, success: bool, video_id):
+    """Repost-check: record the YouTube outcome in the Content Engine shared
+    list, and email an alert when it failed. Never breaks the run."""
+    caption = post.get("caption", "")
+    ig_url = f"https://www.instagram.com/reel/{shortcode}/"
+    try:
+        from content_engine_sync import record_repost
+    except Exception as e:  # noqa: BLE001
+        print(f"[content-engine] sync unavailable: {e}")
+        record_repost = None
+
+    if success:
+        yt_url = f"https://youtube.com/shorts/{video_id}" if video_id else None
+        title = _youtube_safe_title(caption, shortcode) if caption else None
+        if record_repost:
+            record_repost(shortcode, "posted", yt_url=yt_url, yt_title=title,
+                          ig_url=ig_url, caption=caption)
+    else:
+        if record_repost:
+            record_repost(shortcode, "failed", ig_url=ig_url, caption=caption)
+        try:
+            from notifier import send_failure_email
+            send_failure_email(
+                subject=f"Repost FAILED: {shortcode}",
+                body=(f"The reel {shortcode} failed to post to YouTube.\n\n"
+                      f"Instagram: {ig_url}\n"
+                      f"Caption: {caption[:200]}\n\n"
+                      f"Check cron.log on the Mac mini."),
+            )
+        except Exception as e:  # noqa: BLE001
+            print(f"[email] could not send failure alert: {e}")
 
 
 def get_next_post_to_upload() -> Optional[Dict]:
@@ -306,13 +339,17 @@ def run_command(args):
     shortcode = post['shortcode']
     print(f"Uploading: {shortcode}")
     youtube_success = False
+    video_id = None
     progress = load_progress()
     if config.USE_YOUTUBE:
         if shortcode in progress.get("uploaded_youtube", []):
             print("[YouTube] Already uploaded, skipping")
             youtube_success = True
         else:
-            youtube_success = upload_to_youtube(post)
+            video_id = upload_to_youtube(post)
+            youtube_success = bool(video_id)
+            # Repost-check: record the outcome to the shared list + alert on failure
+            _record_repost_outcome(post, shortcode, youtube_success, video_id)
         if youtube_success:
             mark_uploaded(shortcode, "youtube")
 

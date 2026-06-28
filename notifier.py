@@ -111,3 +111,61 @@ def notify_failure(platform, shortcode, error, hint=""):
         print(f"  (notifier: desktop alert shown for {shortcode})")
         seen.add(sig)
         _save_seen(seen)
+
+
+def send_failure_email(subject, body):
+    """Email a failure alert via SMTP. Best-effort; needs SMTP_* env vars.
+
+    Configure in .env:
+      SMTP_HOST (default smtp.gmail.com), SMTP_PORT (default 587),
+      SMTP_USER, SMTP_PASS (an app password for Gmail/Workspace),
+      ALERT_EMAIL_TO (default = SMTP_USER), ALERT_EMAIL_FROM (default = SMTP_USER)
+
+    De-dupes on subject so a stuck post emails only once.
+    """
+    import os
+
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except Exception:
+        pass
+
+    host = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+    port = int(os.environ.get("SMTP_PORT", "587"))
+    user = os.environ.get("SMTP_USER")
+    password = os.environ.get("SMTP_PASS")
+    to_addr = os.environ.get("ALERT_EMAIL_TO", user)
+    from_addr = os.environ.get("ALERT_EMAIL_FROM", user)
+
+    if not (user and password and to_addr):
+        print("  (email: SMTP_USER/SMTP_PASS/ALERT_EMAIL_TO not set — skipping email alert)")
+        return False
+
+    sig = "email|" + subject
+    seen = _load_seen()
+    if sig in seen:
+        print("  (email: already emailed this alert — skipping)")
+        return False
+
+    import smtplib
+    from email.message import EmailMessage
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = from_addr
+    msg["To"] = to_addr
+    msg.set_content(body)
+
+    try:
+        with smtplib.SMTP(host, port, timeout=20) as s:
+            s.starttls()
+            s.login(user, password)
+            s.send_message(msg)
+        print(f"  (email: failure alert sent to {to_addr})")
+        seen.add(sig)
+        _save_seen(seen)
+        return True
+    except Exception as e:  # noqa: BLE001
+        print(f"  (email: send failed: {e})")
+        return False
