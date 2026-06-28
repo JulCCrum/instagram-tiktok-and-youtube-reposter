@@ -39,6 +39,17 @@ def _youtube_safe_title(caption: str, shortcode: str) -> str:
     raw = re.sub(r"\s+", " ", raw).strip()
     return raw[:100].strip() or f"Short - {shortcode}"
 
+
+def _youtube_safe_description(caption: str) -> str:
+    """Make a caption safe to use as a YouTube description.
+
+    YouTube's API rejects any description containing '<' or '>' with an
+    'invalidDescription' error (they look like HTML), so — exactly like
+    _youtube_safe_title — we substitute their plain-English meaning. Unlike
+    the title we keep line breaks intact, since the description is multi-line.
+    """
+    return (caption or "").replace("<", " less than ").replace(">", " greater than ")
+
 # Path to credentials
 CLIENT_SECRETS_FILE = Path(__file__).parent / "client_secrets.json"
 TOKEN_FILE = Path(__file__).parent / "youtube_token.pickle"
@@ -156,7 +167,7 @@ def upload_to_youtube(post: Dict) -> bool:
         body = {
             'snippet': {
                 'title': title,
-                'description': caption,
+                'description': _youtube_safe_description(caption),
                 'tags': ['Shorts'],
                 'categoryId': '22'  # People & Blogs
             },
@@ -247,7 +258,7 @@ def upload_to_youtube_scheduled(post: Dict, publish_time) -> bool:
         body = {
             'snippet': {
                 'title': title,
-                'description': caption,
+                'description': _youtube_safe_description(caption),
                 'tags': ['Shorts'],
                 'categoryId': '22'
             },
