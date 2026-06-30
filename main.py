@@ -60,6 +60,28 @@ def _record_upload_time():
     save_progress(progress)
 
 
+def _enforce_spacing_guard() -> bool:
+    """Enforce that uploads are spaced at least 3 hours apart, with early exit.
+
+    Returns True if the upload should proceed; False if the upload should be skipped
+    because we're within 3 hours of the last upload. This guard fires BEFORE any
+    database reads or network calls — it's cheap insurance against accidental bursts.
+    """
+    MIN_INTERVAL_HOURS = 3
+    MIN_INTERVAL_SECS = MIN_INTERVAL_HOURS * 3600
+
+    last_upload_time = _get_last_upload_time()
+    if last_upload_time is None:
+        return True  # No prior upload, allow
+
+    elapsed = time.time() - last_upload_time
+    if elapsed < MIN_INTERVAL_SECS:
+        # Log for visibility but DON'T raise an exception — just return False
+        # so the caller can decide how to handle it (print, log, silent skip).
+        return False
+    return True
+
+
 def mark_uploaded(shortcode: str, platform: str = None):
     """Mark a post as uploaded. If platform specified, tracks per-platform."""
     progress = load_progress()
@@ -228,17 +250,16 @@ def upload_command(args):
     print("Uploading to platforms..." + (" [DRY RUN]" if dry_run else ""))
     print("=" * 50)
 
+    # Early exit: enforce 3-hour spacing BEFORE any work
+    if not _enforce_spacing_guard():
+        last_upload_time = _get_last_upload_time()
+        elapsed_hours = (time.time() - last_upload_time) / 3600
+        print(f"Spacing guard: uploaded {elapsed_hours:.1f}h ago (minimum 3h required). Skipping.")
+        return
+
     post = get_next_post_to_upload()
     if not post:
         print("No posts pending upload!")
-        return
-
-    # Check posting interval before attempting upload
-    if not _is_upload_interval_satisfied():
-        last_upload_time = _get_last_upload_time()
-        elapsed_hours = (time.time() - last_upload_time) / 3600
-        print(f"Posting interval not satisfied (uploaded {elapsed_hours:.1f}h ago, "
-              f"minimum 3h). Skipping upload, will retry in next scheduled run.")
         return
 
     shortcode = post['shortcode']
@@ -364,11 +385,10 @@ def run_command(args):
         return
 
     # Check posting interval before attempting upload
-    if not _is_upload_interval_satisfied():
+    if not _enforce_spacing_guard():
         last_upload_time = _get_last_upload_time()
         elapsed_hours = (time.time() - last_upload_time) / 3600
-        print(f"Posting interval not satisfied (uploaded {elapsed_hours:.1f}h ago, "
-              f"minimum 3h). Skipping upload, will retry in next scheduled run.")
+        print(f"Spacing guard: uploaded {elapsed_hours:.1f}h ago (minimum 3h required). Skipping.")
         return
 
     if dry_run:
