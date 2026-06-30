@@ -18,6 +18,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Optional, Dict
 
@@ -25,6 +26,38 @@ import config
 from instagram_scraper import scrape_instagram_posts, load_progress, save_progress
 from tiktok_uploader import upload_to_tiktok
 from youtube_uploader import upload_to_youtube, _youtube_safe_title
+
+
+def _get_last_upload_time() -> Optional[float]:
+    """Get the timestamp of the last upload to any platform (YouTube/TikTok)."""
+    progress = load_progress()
+    last_upload = progress.get("last_upload_time")
+    if last_upload is not None:
+        return float(last_upload)
+    return None
+
+
+def _is_upload_interval_satisfied() -> bool:
+    """Check if at least 3 hours have passed since the last upload.
+
+    If no upload has happened yet, returns True (allow first upload).
+    """
+    MIN_INTERVAL_HOURS = 3
+    MIN_INTERVAL_SECS = MIN_INTERVAL_HOURS * 3600
+
+    last_upload_time = _get_last_upload_time()
+    if last_upload_time is None:
+        return True  # No prior upload, allow
+
+    elapsed = time.time() - last_upload_time
+    return elapsed >= MIN_INTERVAL_SECS
+
+
+def _record_upload_time():
+    """Record the current time as the last upload timestamp."""
+    progress = load_progress()
+    progress["last_upload_time"] = time.time()
+    save_progress(progress)
 
 
 def mark_uploaded(shortcode: str, platform: str = None):
@@ -200,6 +233,14 @@ def upload_command(args):
         print("No posts pending upload!")
         return
 
+    # Check posting interval before attempting upload
+    if not _is_upload_interval_satisfied():
+        last_upload_time = _get_last_upload_time()
+        elapsed_hours = (time.time() - last_upload_time) / 3600
+        print(f"Posting interval not satisfied (uploaded {elapsed_hours:.1f}h ago, "
+              f"minimum 3h). Skipping upload, will retry in next scheduled run.")
+        return
+
     shortcode = post['shortcode']
     caption = post.get('caption', '')
     video_files = [f for f in post.get("media_files", []) if f.endswith(".mp4")]
@@ -263,6 +304,7 @@ def upload_command(args):
             print("  (YouTube failed — will retry on next run)")
         if not tiktok_success and (args.tiktok or config.USE_TIKTOK):
             print("  (TikTok failed — will retry on next run)")
+        _record_upload_time()
     else:
         print(f"\nFailed to upload: {post['shortcode']}")
 
@@ -321,6 +363,14 @@ def run_command(args):
             print("[DRY RUN] Would omit this post and try the next")
         return
 
+    # Check posting interval before attempting upload
+    if not _is_upload_interval_satisfied():
+        last_upload_time = _get_last_upload_time()
+        elapsed_hours = (time.time() - last_upload_time) / 3600
+        print(f"Posting interval not satisfied (uploaded {elapsed_hours:.1f}h ago, "
+              f"minimum 3h). Skipping upload, will retry in next scheduled run.")
+        return
+
     if dry_run:
         caption = post.get('caption', '')
         platforms = []
@@ -371,6 +421,7 @@ def run_command(args):
         if tiktok_success:
             results.append("TikTok")
         print(f"Reposted {shortcode} to: {', '.join(results)}")
+        _record_upload_time()
     else:
         print(f"Failed to upload: {shortcode}")
 
