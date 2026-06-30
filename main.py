@@ -82,6 +82,36 @@ def _enforce_spacing_guard() -> bool:
     return True
 
 
+def _lock_upload_cycle():
+    """File-based lock to prevent rapid concurrent runs from posting in parallel.
+
+    Once a run starts an upload, all subsequent runs (even in parallel shells) are
+    blocked for 3 hours. This is the safety net: even if the script is called 5 times
+    in 2 minutes, only the first one posts, and the rest respect the 3h interval.
+    """
+    LOCK_FILE = Path(__file__).parent / ".upload_lock"
+
+    # Check if lock exists and is recent (< 3h old)
+    if LOCK_FILE.exists():
+        try:
+            lock_time = float(LOCK_FILE.read_text())
+            elapsed = time.time() - lock_time
+            if elapsed < 3 * 3600:
+                # Lock is active. Refuse to proceed.
+                return False
+        except (ValueError, OSError):
+            # Corrupted lock file; treat as stale
+            pass
+
+    # Lock is stale or doesn't exist. Create a new one with the current time.
+    try:
+        LOCK_FILE.write_text(str(time.time()))
+    except OSError:
+        pass  # If we can't write the lock, at least try to run (fail open)
+
+    return True
+
+
 def mark_uploaded(shortcode: str, platform: str = None):
     """Mark a post as uploaded. If platform specified, tracks per-platform."""
     progress = load_progress()
@@ -337,6 +367,13 @@ def run_command(args):
     print("=" * 50)
     print("Running repost cycle..." + (" [DRY RUN]" if dry_run else ""))
     print("=" * 50)
+
+    # Acquire upload cycle lock (prevents parallel runs from bursting)
+    if not dry_run and not _lock_upload_cycle():
+        last_upload_time = _get_last_upload_time()
+        elapsed_hours = (time.time() - last_upload_time) / 3600 if last_upload_time else 0
+        print(f"Upload cycle locked: posted {elapsed_hours:.1f}h ago (minimum 3h required). Skipping.")
+        return
 
     # Check if we have posts to upload
     post = get_next_post_to_upload()
