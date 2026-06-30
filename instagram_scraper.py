@@ -151,11 +151,14 @@ def get_profile_posts(page: Page, username: str, max_posts: int = 500) -> List[D
             for link in post_links:
                 href = link.get_attribute("href")
                 if href and href not in [p["url"] for p in posts]:
-                    # Only include posts from this user's profile
-                    if f"/{username}/" not in href:
-                        continue
-                    # Determine if it's a reel or regular post
+                    # Only include posts/reels from this user's profile
+                    # Reels appear as /reel/<code>/ (no username in path) because they auto-link to the creator
+                    # Regular posts are /{username}/p/<code>/
                     is_reel = "/reel/" in href
+                    if is_reel:
+                        pass  # Reels don't include username in the path but are always the creator's
+                    elif f"/{username}/" not in href:
+                        continue  # Regular posts must include the username
                     posts.append({
                         "url": href,
                         "full_url": f"https://www.instagram.com{href}" if href.startswith("/") else href,
@@ -186,6 +189,11 @@ def get_profile_posts(page: Page, username: str, max_posts: int = 500) -> List[D
 def download_post(page: Page, post: dict, save_dir: Path) -> Optional[Dict]:
     """Download a single post using yt-dlp for proper video format and caption"""
     import subprocess
+    import sys
+
+    # Invoke yt-dlp as a module so it works under cron (where the venv's bin/
+    # isn't on PATH and the bare `yt-dlp` binary isn't found).
+    YT_DLP = [sys.executable, "-m", "yt_dlp"]
 
     shortcode = post["shortcode"]
     save_path = save_dir / shortcode
@@ -221,7 +229,7 @@ def download_post(page: Page, post: dict, save_dir: Path) -> Optional[Dict]:
 
         # Get caption with yt-dlp
         caption_cmd = [
-            'yt-dlp',
+            *YT_DLP,
             '--cookies', str(cookies_path),
             '--print', '%(description)s',
             '--no-warnings',
@@ -234,7 +242,7 @@ def download_post(page: Page, post: dict, save_dir: Path) -> Optional[Dict]:
 
         # Download video with yt-dlp
         download_cmd = [
-            'yt-dlp',
+            *YT_DLP,
             '--cookies', str(cookies_path),
             '-o', str(video_path),
             '--no-warnings',
