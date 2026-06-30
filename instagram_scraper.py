@@ -262,7 +262,9 @@ def download_post(page: Page, post: dict, save_dir: Path) -> Optional[Dict]:
             print(f"yt-dlp did not create video file")
 
     except Exception as e:
+        import traceback
         print(f"Error downloading with yt-dlp: {e}")
+        traceback.print_exc()
 
     if result["media_files"]:
         # Save metadata
