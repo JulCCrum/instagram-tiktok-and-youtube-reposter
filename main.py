@@ -280,6 +280,13 @@ def upload_command(args):
     print("Uploading to platforms..." + (" [DRY RUN]" if dry_run else ""))
     print("=" * 50)
 
+    # Acquire upload cycle lock (prevents rapid direct calls from bursting)
+    if not dry_run and not _lock_upload_cycle():
+        last_upload_time = _get_last_upload_time()
+        elapsed_hours = (time.time() - last_upload_time) / 3600 if last_upload_time else 0
+        print(f"Upload cycle locked: posted {elapsed_hours:.1f}h ago (minimum 3h required). Skipping.")
+        return
+
     # Early exit: enforce 3-hour spacing BEFORE any work
     if not _enforce_spacing_guard():
         last_upload_time = _get_last_upload_time()
