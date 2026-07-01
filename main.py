@@ -104,8 +104,10 @@ def _lock_upload_cycle():
             pass
 
     # Lock is stale or doesn't exist. Create a new one with the current time.
+    # **This must happen BEFORE any upload to ensure concurrent runs see the lock.**
+    current_time = time.time()
     try:
-        LOCK_FILE.write_text(str(time.time()))
+        LOCK_FILE.write_text(str(current_time))
     except OSError:
         pass  # If we can't write the lock, at least try to run (fail open)
 
@@ -363,6 +365,12 @@ def upload_command(args):
         if not tiktok_success and (args.tiktok or config.USE_TIKTOK):
             print("  (TikTok failed — will retry on next run)")
         _record_upload_time()
+        # Also update the lock file so the 3h window resets from upload completion.
+        LOCK_FILE = Path(__file__).parent / ".upload_lock"
+        try:
+            LOCK_FILE.write_text(str(time.time()))
+        except OSError:
+            pass
     else:
         print(f"\nFailed to upload: {post['shortcode']}")
 
@@ -486,6 +494,13 @@ def run_command(args):
             results.append("TikTok")
         print(f"Reposted {shortcode} to: {', '.join(results)}")
         _record_upload_time()
+        # Also update the lock file so the 3h window resets from upload completion.
+        # This ensures the lock file and progress.json stay in sync.
+        LOCK_FILE = Path(__file__).parent / ".upload_lock"
+        try:
+            LOCK_FILE.write_text(str(time.time()))
+        except OSError:
+            pass
     else:
         print(f"Failed to upload: {shortcode}")
 
