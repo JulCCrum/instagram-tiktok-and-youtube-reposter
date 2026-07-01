@@ -46,10 +46,11 @@ def record_repost(
     yt_title: str | None = None,
     ig_url: str | None = None,
     caption: str | None = None,
+    videom8_analysis: dict | None = None,
 ) -> bool:
     """Upsert this reel's post in the shared list. Never raises.
 
-    repost_status: 'posted' | 'failed' | 'pending'
+    repost_status: 'posted' | 'failed' | 'pending' | 'analyzed'
     Returns True if the write succeeded.
     """
     db = _client()
@@ -76,6 +77,9 @@ def record_repost(
         if caption:
             # first line doubles as the on-screen hook for now
             data["hook_screen"] = caption.split("\n", 1)[0][:300]
+        if videom8_analysis:
+            data["videom8_analysis"] = videom8_analysis
+            data["videom8_analyzed_at"] = now
         doc.set(data, merge=True)
         print(f"[content-engine] recorded {shortcode} -> {repost_status}")
         return True
