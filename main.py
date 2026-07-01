@@ -26,6 +26,7 @@ import config
 from instagram_scraper import scrape_instagram_posts, load_progress, save_progress
 from tiktok_uploader import upload_to_tiktok
 from youtube_uploader import upload_to_youtube, _youtube_safe_title
+from videom8_analyzer import analyze_reel, store_analysis_in_firestore
 
 
 def _get_last_upload_time() -> Optional[float]:
@@ -364,6 +365,17 @@ def upload_command(args):
             print("  (YouTube failed — will retry on next run)")
         if not tiktok_success and (args.tiktok or config.USE_TIKTOK):
             print("  (TikTok failed — will retry on next run)")
+
+        # Analyze the uploaded reel with Videom8 if YouTube upload succeeded
+        if youtube_success:
+            yt_url = f"https://youtube.com/shorts/{youtube_success}"
+            print(f"\n--- Videom8 Analysis ---")
+            analysis = analyze_reel(yt_url)
+            if analysis:
+                store_analysis_in_firestore(shortcode, analysis, yt_url)
+            else:
+                print(f"[videom8] Analysis skipped for {shortcode}")
+
         _record_upload_time()
         # Also update the lock file so the 3h window resets from upload completion.
         LOCK_FILE = Path(__file__).parent / ".upload_lock"
@@ -493,6 +505,17 @@ def run_command(args):
         if tiktok_success:
             results.append("TikTok")
         print(f"Reposted {shortcode} to: {', '.join(results)}")
+
+        # Analyze the uploaded reel with Videom8 if YouTube upload succeeded
+        if youtube_success:
+            yt_url = f"https://youtube.com/shorts/{video_id}"
+            print(f"\n--- Videom8 Analysis ---")
+            analysis = analyze_reel(yt_url)
+            if analysis:
+                store_analysis_in_firestore(shortcode, analysis, yt_url)
+            else:
+                print(f"[videom8] Analysis skipped for {shortcode}")
+
         _record_upload_time()
         # Also update the lock file so the 3h window resets from upload completion.
         # This ensures the lock file and progress.json stay in sync.
