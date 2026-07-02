@@ -328,6 +328,7 @@ def upload_command(args):
     youtube_success = False
     tiktok_success = False
     progress = load_progress()
+    yt_video_id = None
 
     if config.USE_YOUTUBE:
         if shortcode in load_youtube_skip():
@@ -339,9 +340,16 @@ def upload_command(args):
             mark_uploaded(shortcode, "youtube")
         else:
             print("\n--- YouTube ---")
-            youtube_success = upload_to_youtube(post)
+            yt_video_id = upload_to_youtube(post)
+            youtube_success = bool(yt_video_id)
             if youtube_success:
+                yt_url = f"https://youtube.com/shorts/{yt_video_id}"
                 mark_uploaded(shortcode, "youtube")
+                # Analyze the reel with Videom8 after successful upload
+                print("\n--- Videom8 Analysis ---")
+                analysis = analyze_reel(yt_url)
+                if analysis:
+                    store_analysis_in_firestore(shortcode, analysis, yt_url)
 
     # Upload to TikTok (skip if already uploaded to TikTok)
     if args.tiktok or config.USE_TIKTOK:
@@ -365,16 +373,6 @@ def upload_command(args):
             print("  (YouTube failed — will retry on next run)")
         if not tiktok_success and (args.tiktok or config.USE_TIKTOK):
             print("  (TikTok failed — will retry on next run)")
-
-        # Analyze the uploaded reel with Videom8 if YouTube upload succeeded
-        if youtube_success:
-            yt_url = f"https://youtube.com/shorts/{youtube_success}"
-            print(f"\n--- Videom8 Analysis ---")
-            analysis = analyze_reel(yt_url)
-            if analysis:
-                store_analysis_in_firestore(shortcode, analysis, yt_url)
-            else:
-                print(f"[videom8] Analysis skipped for {shortcode}")
 
         _record_upload_time()
         # Also update the lock file so the 3h window resets from upload completion.
