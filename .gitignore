@@ -45,3 +45,4 @@ Thumbs.db
 .vscode/
 *.sublime-*
 content-engine-sa.json
+.upload_lock
