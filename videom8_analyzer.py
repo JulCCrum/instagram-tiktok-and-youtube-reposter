@@ -10,7 +10,7 @@ import json
 import sys
 from typing import Optional, Dict
 
-VIDEOM8_API = "https://videom8-api-358448469721.us-central1.run.app/api/analyze"
+VIDEOM8_API = "https://videom8-api-618996118256.us-central1.run.app/api/analyze"
 TIMEOUT_SECS = 120  # 2 minutes — Videom8 takes ~40–60s
 
 
