@@ -44,6 +44,7 @@ def record_repost(
     *,
     yt_url: str | None = None,
     yt_title: str | None = None,
+    yt_desc: str | None = None,
     ig_url: str | None = None,
     caption: str | None = None,
     videom8_analysis: dict | None = None,
@@ -72,6 +73,8 @@ def record_repost(
             data["yt_url"] = yt_url
         if yt_title:
             data["yt_title"] = yt_title
+        if yt_desc:
+            data["yt_desc"] = yt_desc
         if ig_url:
             data["ig_url"] = ig_url
         if caption:

@@ -114,14 +114,19 @@ def notify_failure(platform, shortcode, error, hint=""):
 
 
 def send_failure_email(subject, body):
-    """Email a failure alert via SMTP. Best-effort; needs SMTP_* env vars.
+    """Email a failure alert via SMTP (de-duped on subject)."""
+    return send_email(subject, body, dedupe=True)
+
+
+def send_email(subject, body, dedupe=True):
+    """Email via SMTP. Best-effort; needs SMTP_* env vars.
 
     Configure in .env:
       SMTP_HOST (default smtp.gmail.com), SMTP_PORT (default 587),
       SMTP_USER, SMTP_PASS (an app password for Gmail/Workspace),
       ALERT_EMAIL_TO (default = SMTP_USER), ALERT_EMAIL_FROM (default = SMTP_USER)
 
-    De-dupes on subject so a stuck post emails only once.
+    De-dupes on subject (unless dedupe=False) so a stuck post emails only once.
     """
     import os
 
@@ -144,7 +149,7 @@ def send_failure_email(subject, body):
 
     sig = "email|" + subject
     seen = _load_seen()
-    if sig in seen:
+    if dedupe and sig in seen:
         print("  (email: already emailed this alert — skipping)")
         return False
 
@@ -162,7 +167,7 @@ def send_failure_email(subject, body):
             s.starttls()
             s.login(user, password)
             s.send_message(msg)
-        print(f"  (email: failure alert sent to {to_addr})")
+        print(f"  (email: sent to {to_addr})")
         seen.add(sig)
         _save_seen(seen)
         return True

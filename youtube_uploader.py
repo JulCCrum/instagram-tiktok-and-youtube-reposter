@@ -187,13 +187,28 @@ def upload_to_youtube(post: Dict) -> Optional[str]:
         if "#shorts" not in caption.lower():
             caption = f"{caption}\n\n#Shorts"
 
-        # Build a YouTube-safe title (substitutes '<'/'>' — see _youtube_safe_title)
-        title = _youtube_safe_title(caption, post['shortcode'])
+        # Spec item 07: Gemini writes a real title + useful description and
+        # the upload uses them. Falls back to the caption on any failure.
+        try:
+            from yt_metadata import generate_metadata
+            meta = generate_metadata(post.get("caption", ""), post['shortcode'])
+        except Exception as e:  # noqa: BLE001
+            print(f"[yt-metadata] unavailable: {e}")
+            meta = None
+        if meta:
+            title = meta["title"]
+            description = meta["description"]
+        else:
+            title = _youtube_safe_title(caption, post['shortcode'])
+            description = _youtube_safe_description(caption)
+        # Stash what actually got sent so repost-check records the truth.
+        post["yt_title_used"] = title
+        post["yt_desc_used"] = description
 
         body = {
             'snippet': {
                 'title': title,
-                'description': _youtube_safe_description(caption),
+                'description': description,
                 'tags': ['Shorts'],
                 'categoryId': '22'  # People & Blogs
             },
@@ -288,8 +303,21 @@ def upload_to_youtube_scheduled(post: Dict, publish_time) -> bool:
         if "#shorts" not in caption.lower():
             caption = f"{caption}\n\n#Shorts"
 
-        # Build a YouTube-safe title (substitutes '<'/'>' — see _youtube_safe_title)
-        title = _youtube_safe_title(caption, post['shortcode'])
+        # Same Gemini metadata generation as upload_to_youtube (spec item 07)
+        try:
+            from yt_metadata import generate_metadata
+            meta = generate_metadata(post.get("caption", ""), post['shortcode'])
+        except Exception as e:  # noqa: BLE001
+            print(f"[yt-metadata] unavailable: {e}")
+            meta = None
+        if meta:
+            title = meta["title"]
+            description = meta["description"]
+        else:
+            title = _youtube_safe_title(caption, post['shortcode'])
+            description = _youtube_safe_description(caption)
+        post["yt_title_used"] = title
+        post["yt_desc_used"] = description
 
         # Format publish time for YouTube API (ISO 8601)
         publish_at = publish_time.strftime('%Y-%m-%dT%H:%M:%S.000Z')
@@ -297,7 +325,7 @@ def upload_to_youtube_scheduled(post: Dict, publish_time) -> bool:
         body = {
             'snippet': {
                 'title': title,
-                'description': _youtube_safe_description(caption),
+                'description': description,
                 'tags': ['Shorts'],
                 'categoryId': '22'
             },

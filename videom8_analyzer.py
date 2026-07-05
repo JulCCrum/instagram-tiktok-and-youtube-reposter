@@ -69,8 +69,10 @@ def store_analysis_in_firestore(shortcode: str, analysis: Dict, yt_url: str) -> 
 
     try:
         # record_repost accepts videom8_analysis dict which will be merged
-        # into the post doc
-        record_repost(shortcode, "analyzed", yt_url=yt_url,
+        # into the post doc. repost_status stays "posted" — whether the video
+        # landed and whether it's been analyzed are two different facts; the
+        # UI shows "analyzed" from videom8_analysis presence instead.
+        record_repost(shortcode, "posted", yt_url=yt_url,
                       videom8_analysis=analysis)
         print("[videom8] ✓ Analysis stored in Firestore")
         return True

@@ -207,9 +207,14 @@ def _record_repost_outcome(post: Dict, shortcode: str, success: bool, video_id):
 
     if success:
         yt_url = f"https://youtube.com/shorts/{video_id}" if video_id else None
-        title = _youtube_safe_title(caption, shortcode) if caption else None
+        # Prefer the title/description the upload ACTUALLY sent (Gemini-written,
+        # stashed by upload_to_youtube); fall back to the caption-derived title.
+        title = post.get("yt_title_used") or (
+            _youtube_safe_title(caption, shortcode) if caption else None
+        )
         if record_repost:
             record_repost(shortcode, "posted", yt_url=yt_url, yt_title=title,
+                          yt_desc=post.get("yt_desc_used"),
                           ig_url=ig_url, caption=caption)
     else:
         if record_repost:
