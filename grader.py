@@ -281,15 +281,26 @@ VIDEOM8 CONTENT CRITIQUE (automated analysis of the video itself):
 {summarize_videom8(analysis)}
 
 Return JSON exactly like:
-{{"letter": "B+", "why": "2-4 sentences on why it performed this way, tying numbers to content choices", "advice": ["concrete change #1 for the next video", "concrete change #2", "optional #3"]}}"""
+{{"letter": "B+", "headline": "one blunt sentence — the verdict", "why": "2-3 sentences on why it performed this way, tying numbers to content choices", "advice": [{{"do": "short imperative, 3-7 words", "detail": "one concrete sentence expanding on it"}}, {{"do": "...", "detail": "..."}}]}}
+Give 2-3 advice items."""
     out = gemini_json(prompt)
     if not out or not out.get("why"):
         return None
     letter = out.get("letter") or "?"
     advice = out.get("advice") or []
-    text = f"[{letter}] {out['why']}"
-    if advice:
-        text += "\nDo differently:\n" + "\n".join(f"- {a}" for a in advice)
+    # normalize advice: accept both the structured and plain-string shapes
+    norm = []
+    for a in advice:
+        if isinstance(a, dict) and a.get("do"):
+            norm.append({"do": a["do"], "detail": a.get("detail", "")})
+        elif isinstance(a, str):
+            norm.append({"do": a, "detail": ""})
+    out["advice"] = norm
+    text = f"[{letter}] {out.get('headline', '')}\n{out['why']}"
+    if norm:
+        text += "\nDo differently:\n" + "\n".join(
+            f"- {a['do']}" + (f" — {a['detail']}" if a["detail"] else "") for a in norm
+        )
     return text, letter, out
 
 
@@ -359,8 +370,11 @@ def run(dry_run=False, only_post=None):
             jobs.append("24hr")
         if age >= DAY_7 and not p.get("grade_final"):
             jobs.append("7day")
-        if only_post and not jobs:
-            jobs = ["30min", "24hr", "7day"]  # force everything when testing
+        if only_post:
+            # Force a re-run of every AGE-ELIGIBLE milestone (overwrites
+            # existing grades) — but never a premature 24h/7d.
+            jobs = [w for w, cut in (("30min", MIN_30), ("24hr", HR_24), ("7day", DAY_7))
+                    if age >= cut]
         if jobs:
             due.append((p, jobs))
 
@@ -436,14 +450,18 @@ def run(dry_run=False, only_post=None):
                     continue
                 text, letter, out = result
                 patch["review_24h"] = text
+                patch["review_24h_data"] = out  # structured, for the UI
                 hook = (p.get("hook_screen") or code)[:60]
+                advice_lines = "\n\n".join(
+                    f"• {a['do'].upper()}\n  {a['detail']}" if a["detail"] else f"• {a['do']}"
+                    for a in out.get("advice", [])
+                )
                 body = (
-                    f"{hook}\n\n"
+                    f"{hook}\n[{letter}] {out.get('headline', '')}\n\n"
                     f"Instagram (24h): {fmt_stats(ig)}\n"
                     f"YouTube  (24h): {fmt_stats(yt)}\n\n"
-                    f"Why it performed this way:\n{out.get('why', '')}\n\n"
-                    "Do differently on the next video:\n"
-                    + "\n".join(f"- {a}" for a in out.get("advice", []))
+                    f"WHY IT PERFORMED THIS WAY\n{out.get('why', '')}\n\n"
+                    f"DO DIFFERENTLY ON THE NEXT VIDEO\n{advice_lines}"
                     + f"\n\nIG: {p.get('ig_url', '—')}\nYT: {p.get('yt_url', '—')}"
                 )
                 send_email(f"24h review [{letter}]: {hook}", body)
