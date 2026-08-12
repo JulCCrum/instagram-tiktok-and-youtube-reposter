@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Self-healing cron wrapper for the Instagram -> YouTube/TikTok reposter.
+# Self-healing cron wrapper for the Content System reposter + grader.
 #
 # WHY THIS EXISTS
 # ----------------
@@ -12,11 +12,15 @@
 # every time and nothing was ever posted again.
 #
 # This wrapper runs on EVERY cron tick and guarantees the environment is
-# healthy before launching the reposter. If something is missing it repairs
+# healthy before launching the job. If something is missing it repairs
 # itself, so a future break cannot silently kill the automation again.
 #
-# Install once with setup_cron.sh (which points cron here instead of at the
-# bare python). Logs go to selfheal.log so fixes are visible + auditable.
+# Usage:
+#   run_reposter.sh            # repost cycle (default)
+#   run_reposter.sh grader     # grader job
+#
+# Install once with setup_cron.sh. Logs go to selfheal.log so fixes are
+# visible + auditable.
 
 set -u
 
@@ -64,7 +68,14 @@ then
     venv/bin/python -m playwright install chromium >> "$SELFHEAL_LOG" 2>&1 || log "[self-heal] ERROR: playwright install failed"
 fi
 
-# ---- 3. Run the actual reposter cycle ----
-log "[run] starting repost cycle"
-venv/bin/python main.py run "$@" >> "$SCRIPT_DIR/cron.log" 2>&1
-log "[run] finished repost cycle (exit=$?)"
+# ---- 3. Run the requested job ----
+JOB="${1:-run}"
+if [ "$JOB" = "grader" ]; then
+    log "[grader] starting"
+    venv/bin/python grader.py >> "$SCRIPT_DIR/grader.log" 2>&1
+    log "[grader] finished (exit=$?)"
+else
+    log "[run] starting repost cycle"
+    venv/bin/python main.py run "$@" >> "$SCRIPT_DIR/cron.log" 2>&1
+    log "[run] finished repost cycle (exit=$?)"
+fi
