@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Bridge from the reposter to the Content Engine's shared list (Firestore).
 
 After the bot posts a reel to YouTube, it records the outcome in the

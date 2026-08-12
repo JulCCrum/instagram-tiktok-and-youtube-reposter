@@ -325,7 +325,8 @@ def scrape_instagram_posts(username: str = None, max_posts: int = 500) -> List[D
                 if result:
                     results.append(result)
                     downloaded.append(post["shortcode"])
-                    save_progress({"downloaded": downloaded, "uploaded": progress.get("uploaded", [])})
+                    progress["downloaded"] = downloaded
+                    save_progress(progress)
 
                 human_delay(2, 4)
 
