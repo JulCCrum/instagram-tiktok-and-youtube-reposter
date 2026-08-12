@@ -27,7 +27,7 @@
 
 ### Check Status First
 ```bash
-cd /Users/chasecrummedyo/instagram-tiktok-reposter
+cd ~/Projects/content-system/reposter
 python main.py status
 ```
 
@@ -57,12 +57,12 @@ python main.py upload
 
 | File | Path |
 |------|------|
-| Main script | `/Users/chasecrummedyo/instagram-tiktok-reposter/main.py` |
-| Scheduler | `/Users/chasecrummedyo/instagram-tiktok-reposter/schedule_all.py` |
-| Progress tracker | `/Users/chasecrummedyo/instagram-tiktok-reposter/progress.json` |
-| Media directory | `/Users/chasecrummedyo/instagram-tiktok-reposter/media/{shortcode}/` |
-| Video files | `/Users/chasecrummedyo/instagram-tiktok-reposter/media/{shortcode}/*.mp4` |
-| Metadata | `/Users/chasecrummedyo/instagram-tiktok-reposter/media/{shortcode}/metadata.json` |
+| Main script | `~/Projects/content-system/reposter/main.py` |
+| Scheduler | `~/Projects/content-system/reposter/schedule_all.py` |
+| Progress tracker | `~/Projects/content-system/reposter/progress.json` |
+| Media directory | `~/Projects/content-system/reposter/media/{shortcode}/` |
+| Video files | `~/Projects/content-system/reposter/media/{shortcode}/*.mp4` |
+| Metadata | `~/Projects/content-system/reposter/media/{shortcode}/metadata.json` |
 
 ---
 
@@ -70,7 +70,7 @@ python main.py upload
 
 1. **Always run status first:**
    ```bash
-   cd /Users/chasecrummedyo/instagram-tiktok-reposter
+   cd ~/Projects/content-system/reposter
    python main.py status
    ```
 

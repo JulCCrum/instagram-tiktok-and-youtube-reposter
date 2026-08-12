@@ -2,7 +2,7 @@
 # Run this ON THE MAC MINI, from inside the cloned repo, AFTER you've rsynced
 # the secrets/state/media over from the old Mac.
 #
-#   cd ~/instagram-tiktok-reposter
+#   cd ~/Projects/content-system/reposter
 #   ./migrate_setup.sh
 #
 set -e

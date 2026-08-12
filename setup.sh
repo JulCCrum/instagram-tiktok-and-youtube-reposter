@@ -56,7 +56,7 @@ echo ""
 # --- Clone or update repo ---
 echo "[2/6] Setting up project..."
 
-INSTALL_DIR="${INSTALL_DIR:-$HOME/instagram-tiktok-reposter}"
+INSTALL_DIR="${INSTALL_DIR:-$HOME/Projects/content-system/reposter}"
 
 if [ -d "$INSTALL_DIR/.git" ]; then
     echo "  Project already exists at $INSTALL_DIR, pulling latest..."

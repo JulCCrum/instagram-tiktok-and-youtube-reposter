@@ -21,19 +21,19 @@ The code itself lives on GitHub: https://github.com/JulCCrum/instagram-tiktok-an
 brew install python@3.12 terminal-notifier
 
 # 2. Get the code
-cd ~
-git clone https://github.com/JulCCrum/instagram-tiktok-and-youtube-reposter.git instagram-tiktok-reposter
+cd ~/Projects/content-system
+git clone https://github.com/JulCCrum/instagram-tiktok-and-youtube-reposter.git reposter
 
 # 3. Plug in this SSD, then copy the kit INTO the repo
 rsync -rth --modify-window=1 \
   "/Volumes/Extreme SSD/instagram-tiktok-reposter-archive/" \
-  ~/instagram-tiktok-reposter/
+  ~/Projects/content-system/reposter/
 
 # 4. Re-tighten the secret file permission (exFAT dropped it)
-chmod 600 ~/instagram-tiktok-reposter/.env
+chmod 600 ~/Projects/content-system/reposter/.env
 
 # 5. Build venv, deps, Playwright, cron — all automated
-cd ~/instagram-tiktok-reposter
+cd ~/Projects/content-system/reposter
 ./migrate_setup.sh
 
 # 6. Verify state BEFORE it posts

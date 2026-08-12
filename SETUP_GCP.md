@@ -10,7 +10,7 @@ This guide will help you set up the Instagram to TikTok reposter on Google Cloud
 2. Navigate to **Compute Engine** > **VM Instances**
 3. Click **Create Instance**
 4. Configure:
-   - **Name**: `instagram-tiktok-reposter`
+   - **Name**: `content-system/reposter`
    - **Region**: Choose one close to you
    - **Machine type**: `e2-medium` (2 vCPU, 4 GB RAM) - ~$25/month
      - OR use `e2-micro` for free tier (may be slower)
@@ -23,7 +23,7 @@ This guide will help you set up the Instagram to TikTok reposter on Google Cloud
 ### Option B: Using gcloud CLI
 
 ```bash
-gcloud compute instances create instagram-tiktok-reposter \
+gcloud compute instances create content-system/reposter \
     --machine-type=e2-medium \
     --zone=us-central1-a \
     --image-family=ubuntu-2204-lts \
@@ -34,7 +34,7 @@ gcloud compute instances create instagram-tiktok-reposter \
 ## Step 2: Connect to Your VM
 
 ```bash
-gcloud compute ssh instagram-tiktok-reposter --zone=us-central1-a
+gcloud compute ssh content-system/reposter --zone=us-central1-a
 ```
 
 ## Step 3: Install Dependencies
@@ -66,8 +66,8 @@ sudo apt install -y libnss3 libatk-bridge2.0-0 libdrm2 libxkbcommon0 libgbm1 lib
 ```bash
 # Clone/copy the project
 cd ~
-mkdir -p instagram-tiktok-reposter
-cd instagram-tiktok-reposter
+mkdir -p content-system/reposter
+cd content-system/reposter
 
 # Create virtual environment
 python3.11 -m venv venv
@@ -87,7 +87,7 @@ From your local machine:
 
 ```bash
 # Copy files to VM
-gcloud compute scp --recurse ~/instagram-tiktok-reposter/* instagram-tiktok-reposter:~/instagram-tiktok-reposter/ --zone=us-central1-a
+gcloud compute scp --recurse ~/content-system/reposter/* content-system/reposter:~/content-system/reposter/ --zone=us-central1-a
 ```
 
 Or create files directly on the VM using nano/vim.
@@ -97,7 +97,7 @@ Or create files directly on the VM using nano/vim.
 On the VM:
 
 ```bash
-cd ~/instagram-tiktok-reposter
+cd ~/content-system/reposter
 cp .env.example .env
 nano .env  # Edit with your credentials
 ```
@@ -118,10 +118,10 @@ For the first time, you need to login manually to save your session. This requir
 
 ```bash
 # On your local machine, install XQuartz (Mac) or have X11 (Linux)
-gcloud compute ssh instagram-tiktok-reposter --zone=us-central1-a -- -X
+gcloud compute ssh content-system/reposter --zone=us-central1-a -- -X
 
 # On VM
-cd ~/instagram-tiktok-reposter
+cd ~/content-system/reposter
 source venv/bin/activate
 python main.py init
 ```
@@ -133,7 +133,7 @@ python main.py init
 sudo apt install -y xvfb
 
 # Run with virtual display
-cd ~/instagram-tiktok-reposter
+cd ~/content-system/reposter
 source venv/bin/activate
 
 # Set headless to False in config.py temporarily
@@ -154,11 +154,11 @@ vncpasswd
 vncserver :1 -geometry 1280x720
 
 # On your local machine, create SSH tunnel
-gcloud compute ssh instagram-tiktok-reposter --zone=us-central1-a -- -L 5901:localhost:5901
+gcloud compute ssh content-system/reposter --zone=us-central1-a -- -L 5901:localhost:5901
 
 # Connect with VNC viewer to localhost:5901
 # Then in the VNC session, open terminal and run:
-cd ~/instagram-tiktok-reposter
+cd ~/content-system/reposter
 source venv/bin/activate
 python main.py init
 ```
@@ -166,7 +166,7 @@ python main.py init
 ## Step 8: Test the Script
 
 ```bash
-cd ~/instagram-tiktok-reposter
+cd ~/content-system/reposter
 source venv/bin/activate
 
 # Check status
@@ -186,7 +186,7 @@ python main.py upload
 crontab -e
 
 # Add this line (runs every 3 hours):
-0 */3 * * * cd /home/$USER/instagram-tiktok-reposter && /home/$USER/instagram-tiktok-reposter/venv/bin/python main.py run >> /home/$USER/instagram-tiktok-reposter/cron.log 2>&1
+0 */3 * * * cd /home/$USER/content-system/reposter && /home/$USER/content-system/reposter/venv/bin/python main.py run >> /home/$USER/content-system/reposter/cron.log 2>&1
 ```
 
 This will:
@@ -199,10 +199,10 @@ This will:
 
 ```bash
 # Check cron logs
-tail -f ~/instagram-tiktok-reposter/cron.log
+tail -f ~/content-system/reposter/cron.log
 
 # Check progress
-cd ~/instagram-tiktok-reposter
+cd ~/content-system/reposter
 source venv/bin/activate
 python main.py status
 ```
