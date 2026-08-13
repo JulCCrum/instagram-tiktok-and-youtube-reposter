@@ -27,6 +27,14 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# ---- 0. Make sure tools like ffmpeg/yt-dlp are on PATH ----------------
+# Cron runs with a minimal PATH that does NOT include Homebrew's bin dir,
+# so `ffmpeg` (installed at /opt/homebrew/bin) was invisible and every
+# YouTube conversion silently fell back to the un-converted file. Add the
+# common Homebrew + macOS tool dirs (covers Intel + Apple Silicon both).
+PATH=/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH
+export PATH
+
 PY=venv/bin/python
 SELFHEAL_LOG="$SCRIPT_DIR/selfheal.log"
 
