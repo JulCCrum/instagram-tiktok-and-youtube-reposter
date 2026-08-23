@@ -193,7 +193,10 @@ def download_post(page: Page, post: dict, save_dir: Path) -> Optional[Dict]:
 
     # Invoke yt-dlp as a module so it works under cron (where the venv's bin/
     # isn't on PATH and the bare `yt-dlp` binary isn't found).
-    YT_DLP = [sys.executable, "-m", "yt_dlp"]
+    # Keep this project isolated from ~/.config/yt-dlp/config. A global option
+    # added for another yt-dlp installation can otherwise make this venv's
+    # older, Python-compatible version exit before it contacts Instagram.
+    YT_DLP = [sys.executable, "-m", "yt_dlp", "--ignore-config"]
 
     shortcode = post["shortcode"]
     save_path = save_dir / shortcode
@@ -249,7 +252,12 @@ def download_post(page: Page, post: dict, save_dir: Path) -> Optional[Dict]:
             '--quiet',
             post["full_url"]
         ]
-        subprocess.run(download_cmd, capture_output=True, timeout=120)
+        download_result = subprocess.run(
+            download_cmd,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
 
         # Clean up cookies file
         if cookies_path.exists():
@@ -259,7 +267,13 @@ def download_post(page: Page, post: dict, save_dir: Path) -> Optional[Dict]:
             result["media_files"].append(str(video_path))
             print(f"Downloaded video: {video_path}")
         else:
-            print(f"yt-dlp did not create video file")
+            details = (download_result.stderr or download_result.stdout or "").strip()
+            print(
+                "yt-dlp failed to create video file "
+                f"(exit={download_result.returncode})"
+            )
+            if details:
+                print(details)
 
     except Exception as e:
         import traceback
